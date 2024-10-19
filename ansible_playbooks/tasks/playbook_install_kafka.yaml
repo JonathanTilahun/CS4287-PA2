@@ -1,0 +1,56 @@
+# tasks/playbook_install_kafka.yaml
+# Author: Micah Bronfman
+# Purpose: Install Kafka on Cloud VMs
+
+- name: "Create Kafka directory under /opt"
+  file:
+    path: /opt/kafka
+    state: directory
+    mode: '0755'
+
+- name: Copy Kafka tarball
+  copy:
+    src: /tmp/kafka/kafka_2.13-3.8.0.tgz
+    dest: /opt/kafka/
+    mode: '0644'
+
+- name: "Extract Kafka archive"
+  unarchive:
+    src: /opt/kafka/kafka_2.13-3.8.0.tgz
+    dest: /opt/kafka/
+    remote_src: yes
+
+- name: "Set Kafka environment variables"
+  lineinfile:
+    path: /etc/environment
+    line: "{{ item }}"
+  loop:
+    - "KAFKA_HOME=/opt/kafka/kafka_2.13-3.8.0"
+    - "PATH=$PATH:$KAFKA_HOME/bin"
+
+- name: "Reload environment variables"
+  shell: source /etc/environment
+
+- name: "Create Kafka data directories"
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/kafka/kafka-logs
+    - /opt/kafka/zookeeper-data
+
+- name: "Set permissions for Kafka directories"
+  file:
+    path: /opt/kafka
+    owner: "{{ cloud_user }}"
+    group: "{{ cloud_user }}"
+    recurse: yes
+
+- name: "Verify Kafka installation"
+  shell: /opt/kafka/kafka_2.13-3.8.0/bin/kafka-topics.sh --version
+  register: kafka_version
+
+- name: "Display Kafka version"
+  debug:
+    msg: "Kafka version installed: {{ kafka_version.stdout }}"
